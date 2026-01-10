@@ -11,6 +11,7 @@ import {
   processAttendanceRecords,
   type ShiftPeriod,
 } from "@/lib/attendanceShifts";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type AttendantOption = {
   id_user: string;
@@ -312,6 +313,7 @@ export default function AttendantDailyReportPage() {
               </p>
             </div>
           </div>
+          <ThemeToggle />
         </div>
       </header>
 

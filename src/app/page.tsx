@@ -16,6 +16,7 @@ import {
 import { useAttendance } from "@/hooks/useAttendance";
 import type { AttendanceSummary, TimelineEvent } from "@/types/intercom";
 import { formatMinutes } from "@/lib/calculations";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const formatTime = (dateStr: string): string => {
   if (!dateStr) return "-";
@@ -237,6 +238,7 @@ function Dashboard({
             <p className="text-sm text-gray-500">Intercom - BotConversa</p>
           </div>
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Link
               href="/relatorios/atendente"
               className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
