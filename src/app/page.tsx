@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   Users,
@@ -10,13 +11,14 @@ import {
   ChevronLeft,
   Calendar,
   Filter,
-  Download,
   RefreshCw,
   Search,
+  BarChart2,
 } from "lucide-react";
 import { useAttendance } from "@/hooks/useAttendance";
 import type { AttendanceSummary, TimelineEvent } from "@/types/intercom";
 import { formatMinutes } from "@/lib/calculations";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const formatTime = (dateStr: string): string => {
   return new Date(dateStr).toLocaleTimeString("pt-BR", {
@@ -242,10 +244,24 @@ function Dashboard({
             </h1>
             <p className="text-sm text-gray-500">Intercom - BotConversa</p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-            <RefreshCw className="w-4 h-4" />
-            Atualizar
-          </button>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/relatorios/atendente"
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-semibold tracking-wide"
+            >
+              <BarChart2 className="w-4 h-4" />
+              RELATÓRIO DIÁRIO POR ATENDENTE
+            </Link>
+            <ThemeToggle />
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Atualizar
+            </button>
+          </div>
         </div>
       </header>
 
@@ -308,16 +324,6 @@ function Dashboard({
               <RefreshCw className="w-4 h-4" />
               Atualizar
             </button>
-            <div className="ml-auto flex gap-2">
-              <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors">
-                <Download className="w-4 h-4" />
-                Exportar PDF
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors">
-                <Download className="w-4 h-4" />
-                Exportar Excel
-              </button>
-            </div>
           </div>
         </div>
 
@@ -431,8 +437,12 @@ function Dashboard({
 }
 
 export default function Home() {
-  const [startDate, setStartDate] = useState("2026-01-06");
-  const [endDate, setEndDate] = useState("2026-01-06");
+  const today = new Date();
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(today.getDate() - 6);
+
+  const [startDate, setStartDate] = useState(oneWeekAgo.toISOString().slice(0, 10));
+  const [endDate, setEndDate] = useState(today.toISOString().slice(0, 10));
 
   const { summary, loading, error, refetch } = useAttendance(
     startDate,
