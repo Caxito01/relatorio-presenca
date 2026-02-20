@@ -141,6 +141,10 @@ export default function AttendantDailyReportPage() {
   const [endDate, setEndDate] = useState(today.toISOString().slice(0, 10));
 
   const loadAttendants = async (start: string, end: string) => {
+    // Limpa imediatamente para nenhum nome antigo aparecer enquanto carrega
+    setAttendants([]);
+    setSelectedUserId("");
+    setRecords([]);
     try {
       const uniqueList = await attendanceService.getUniqueAttendantsByDateRange(start, end);
       const attendantOptions: AttendantOption[] = uniqueList.map((a) => ({
@@ -148,11 +152,7 @@ export default function AttendantDailyReportPage() {
         name: a.name,
       }));
       setAttendants(attendantOptions);
-      // Se o usuário selecionado não existe no novo período, seleciona o primeiro disponível
-      setSelectedUserId((prev) => {
-        const exists = attendantOptions.some((a) => a.id_user === prev);
-        return exists ? prev : (attendantOptions[0]?.id_user ?? "");
-      });
+      setSelectedUserId(attendantOptions[0]?.id_user ?? "");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Erro ao carregar atendentes";
       setError(msg);
