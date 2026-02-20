@@ -51,16 +51,20 @@ function buildDailyRows(
 
   const rows: DailyRow[] = [];
 
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
 
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+  for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
     const key = d.toISOString().slice(0, 10);
     const dayRecords = byDay[key] ?? [];
 
+    const dayDateForLabel = new Date(`${key}T12:00:00Z`);
+
     if (dayRecords.length === 0) {
-      const weekday = d.toLocaleDateString("pt-BR", { weekday: "long" });
-      const formattedDate = d.toLocaleDateString("pt-BR");
+      const weekday = dayDateForLabel.toLocaleDateString("pt-BR", {
+        weekday: "long",
+      });
+      const formattedDate = dayDateForLabel.toLocaleDateString("pt-BR");
 
       rows.push({
         dateKey: key,
@@ -84,6 +88,7 @@ function buildDailyRows(
     let totalAway = 0;
     let firstEventTime: string | null = null;
     let lastEventTime: string | null = null;
+    const awayEventLabels: string[] = [];
 
     for (let i = 0; i < sorted.length; i++) {
       const current = sorted[i];
@@ -100,21 +105,26 @@ function buildDailyRows(
           (new Date(next.date).getTime() - currentDate.getTime()) / 60000;
         if (current.away_mode_enabled === 1) totalAway += diffMinutes;
         else totalPresent += diffMinutes;
+
+        if (current.away_mode_enabled === 1) {
+          const time = current.date.substring(11, 16);
+          const reason = current.away_status_reason || "Ausente";
+          awayEventLabels.push(`${time} ${reason} (${formatMinutes(diffMinutes)})`);
+        }
+      } else {
+        if (current.away_mode_enabled === 1) {
+          const time = current.date.substring(11, 16);
+          const reason = current.away_status_reason || "Ausente";
+          awayEventLabels.push(`${time} ${reason}`);
+        }
       }
     }
 
     const anyRecord = sorted[sorted.length - 1];
-    const dayDate = new Date(key);
-    const weekday = dayDate.toLocaleDateString("pt-BR", {
+    const weekday = dayDateForLabel.toLocaleDateString("pt-BR", {
       weekday: "long",
     });
-    const formattedDate = dayDate.toLocaleDateString("pt-BR");
-
-    const reasonsSet = new Set(
-      sorted
-        .map((r) => r.away_status_reason)
-        .filter((r): r is string => !!r),
-    );
+    const formattedDate = dayDateForLabel.toLocaleDateString("pt-BR");
 
     rows.push({
       dateKey: key,
@@ -125,7 +135,7 @@ function buildDailyRows(
       firstEventTime,
       lastEventTime,
       currentStatus: anyRecord.away_mode_enabled === 1 ? "away" : "online",
-      reasons: Array.from(reasonsSet),
+      reasons: awayEventLabels,
     });
   }
 
