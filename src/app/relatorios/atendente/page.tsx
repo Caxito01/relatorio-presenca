@@ -306,23 +306,30 @@ export default function AttendantDailyReportPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {allShifts.map((shift, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 font-medium text-gray-900">{shift.name}</td>
-                      <td className="px-6 py-4 text-gray-600">
-                        {new Date(shift.date + "T12:00:00Z").toLocaleDateString("pt-BR")}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                          {shift.shiftIcon} {shift.shift}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-gray-800">{shift.entryFormatted}</td>
-                      <td className="px-6 py-4 text-gray-800">{shift.exitFormatted}</td>
-                      <td className="px-6 py-4 text-green-600 font-medium">{shift.presentFormatted}</td>
-                      <td className="px-6 py-4 text-red-600 font-medium">{shift.awayFormatted}</td>
-                    </tr>
-                  ))}
+                  {(() => {
+                    const uniqueDates = [...new Set(allShifts.map((s) => s.date))];
+                    const dateIndexMap = Object.fromEntries(uniqueDates.map((d, i) => [d, i]));
+                    return allShifts.map((shift, idx) => {
+                      const isEven = dateIndexMap[shift.date] % 2 === 0;
+                      return (
+                        <tr key={idx} className={isEven ? "hover:bg-blue-50" : "bg-blue-50 hover:bg-blue-100"}>
+                          <td className="px-6 py-4 font-medium text-gray-900">{shift.name}</td>
+                          <td className="px-6 py-4 text-gray-600">
+                            {new Date(shift.date + "T12:00:00Z").toLocaleDateString("pt-BR")}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                              {shift.shiftIcon} {shift.shift}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-gray-800">{shift.entryFormatted}</td>
+                          <td className="px-6 py-4 text-gray-800">{shift.exitFormatted}</td>
+                          <td className="px-6 py-4 text-green-600 font-medium">{shift.presentFormatted}</td>
+                          <td className="px-6 py-4 text-red-600 font-medium">{shift.awayFormatted}</td>
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -413,8 +420,8 @@ export default function AttendantDailyReportPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {dailyRows.map((row) => (
-                    <tr key={row.dateKey} className="hover:bg-gray-50">
+                  {dailyRows.map((row, idx) => (
+                    <tr key={row.dateKey} className={idx % 2 === 0 ? "hover:bg-blue-50" : "bg-blue-50 hover:bg-blue-100"}>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
                           <span className="font-medium text-gray-900">
