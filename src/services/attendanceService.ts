@@ -8,7 +8,8 @@ export const attendanceService = {
       .select('*')
       .gte('date', `${startDate}T00:00:00`)
       .lte('date', `${endDate}T23:59:59`)
-      .order('date', { ascending: true });
+      .order('date', { ascending: true })
+      .limit(10000);
 
     if (error) throw error;
     return data || [];
@@ -28,7 +29,7 @@ export const attendanceService = {
     if (startDate) query = query.gte('date', `${startDate}T00:00:00`);
     if (endDate) query = query.lte('date', `${endDate}T23:59:59`);
 
-    const { data, error } = await query;
+    const { data, error } = await query.limit(10000);
     if (error) throw error;
     return data || [];
   },
@@ -37,7 +38,8 @@ export const attendanceService = {
     const { data, error } = await supabase
       .from('intercom_attendance')
       .select('id_user, name, email')
-      .order('name');
+      .order('name')
+      .limit(10000);
 
     if (error) throw error;
 

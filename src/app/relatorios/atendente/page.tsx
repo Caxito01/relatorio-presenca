@@ -148,48 +148,53 @@ export default function AttendantDailyReportPage() {
   );
   const [endDate, setEndDate] = useState(today.toISOString().slice(0, 10));
 
-  const loadData = async () => {
+  const loadAttendants = async () => {
+    try {
+      const uniqueList = await attendanceService.getUniqueAttendants();
+      const attendantOptions: AttendantOption[] = uniqueList.map((a) => ({
+        id_user: a.id_user,
+        name: a.name,
+      }));
+      setAttendants(attendantOptions);
+      if (!selectedUserId && attendantOptions.length > 0) {
+        setSelectedUserId(attendantOptions[0].id_user);
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erro ao carregar atendentes";
+      setError(msg);
+    }
+  };
+
+  const loadRecords = async (userId: string) => {
+    if (!userId) { setRecords([]); return; }
     try {
       setLoading(true);
       setError(null);
-      const data = await attendanceService.getByDateRange(startDate, endDate);
-
-      // gerar lista de atendentes únicos apenas dentro do período selecionado
-      const uniqueAttendantsMap = new Map<string, AttendantOption>();
-      for (const rec of data) {
-        if (!uniqueAttendantsMap.has(rec.id_user)) {
-          uniqueAttendantsMap.set(rec.id_user, {
-            id_user: rec.id_user,
-            name: rec.name,
-          });
-        }
-      }
-      const uniqueAttendants = Array.from(uniqueAttendantsMap.values());
-      setAttendants(uniqueAttendants);
-
-      // se ainda não houver atendente selecionado, selecionar o primeiro da lista
-      let effectiveUserId = selectedUserId;
-      if (!effectiveUserId && uniqueAttendants.length > 0) {
-        effectiveUserId = uniqueAttendants[0].id_user;
-        setSelectedUserId(effectiveUserId);
-      }
-
-      // filtrar registros do atendente selecionado
-      if (effectiveUserId) {
-        setRecords(data.filter((rec) => rec.id_user === effectiveUserId));
-      } else {
-        setRecords([]);
-      }
-    } catch (e: any) {
+      const userRecords = await attendanceService.getByUser(userId, startDate, endDate);
+      setRecords(userRecords);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Erro ao carregar registros";
       console.error(e);
-      setError(e.message ?? "Erro ao carregar registros");
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
+  // Compatibilidade: loadData ainda funciona para o botão "Aplicar filtros"
+  const loadData = () => loadRecords(selectedUserId);
+
+  // Carrega lista de atendentes uma única vez (mount)
   useEffect(() => {
-    loadData();
+    loadAttendants();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Carrega registros sempre que usuário ou datas mudarem
+  useEffect(() => {
+    if (selectedUserId) {
+      loadRecords(selectedUserId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUserId, startDate, endDate]);
 
