@@ -80,6 +80,34 @@ export const attendanceService = {
     return unique.sort((a, b) => a.name.localeCompare(b.name));
   },
 
+  async getUniqueAttendantsByDateRange(
+    startDate: string,
+    endDate: string,
+  ): Promise<{ id_user: string; name: string; email: string }[]> {
+    const allData: { id_user: string; name: string; email: string }[] = [];
+    const pageSize = 1000;
+    let offset = 0;
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('intercom_attendance')
+        .select('id_user, name, email')
+        .gte('date', `${startDate}T00:00:00`)
+        .lte('date', `${endDate}T23:59:59`)
+        .order('id_user')
+        .range(offset, offset + pageSize - 1);
+
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      allData.push(...(data as { id_user: string; name: string; email: string }[]));
+      if (data.length < pageSize) break;
+      offset += pageSize;
+    }
+
+    const unique = [...new Map(allData.map((i) => [i.id_user, i])).values()];
+    return unique.sort((a, b) => a.name.localeCompare(b.name));
+  },
+
   async getByName(
     name: string,
     startDate?: string,

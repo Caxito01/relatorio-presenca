@@ -140,17 +140,19 @@ export default function AttendantDailyReportPage() {
   );
   const [endDate, setEndDate] = useState(today.toISOString().slice(0, 10));
 
-  const loadAttendants = async () => {
+  const loadAttendants = async (start: string, end: string) => {
     try {
-      const uniqueList = await attendanceService.getUniqueAttendants();
+      const uniqueList = await attendanceService.getUniqueAttendantsByDateRange(start, end);
       const attendantOptions: AttendantOption[] = uniqueList.map((a) => ({
         id_user: a.id_user,
         name: a.name,
       }));
       setAttendants(attendantOptions);
-      if (!selectedUserId && attendantOptions.length > 0) {
-        setSelectedUserId(attendantOptions[0].id_user);
-      }
+      // Se o usuário selecionado não existe no novo período, seleciona o primeiro disponível
+      setSelectedUserId((prev) => {
+        const exists = attendantOptions.some((a) => a.id_user === prev);
+        return exists ? prev : (attendantOptions[0]?.id_user ?? "");
+      });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Erro ao carregar atendentes";
       setError(msg);
@@ -175,11 +177,11 @@ export default function AttendantDailyReportPage() {
 
   // Compatibilidade removida — filtros já aplicam via useEffect
 
-  // Carrega lista de atendentes uma única vez (mount)
+  // Recarrega lista de atendentes sempre que as datas mudarem
   useEffect(() => {
-    loadAttendants();
+    loadAttendants(startDate, endDate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [startDate, endDate]);
 
   // Carrega registros sempre que usuário ou datas mudarem
   useEffect(() => {
