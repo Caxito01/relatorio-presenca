@@ -352,8 +352,6 @@ export function processAttendanceRecords(records: AttendanceRecord[]): DailySumm
       const dailyAway = shifts.reduce((sum, s) => sum + s.awayMinutes, 0);
       const dailyTotal = dailyPresent + dailyAway;
 
-      const first = sorted[0];
-
       allDailySummaries.push({
         id_user: userId,
         name: first.name,
