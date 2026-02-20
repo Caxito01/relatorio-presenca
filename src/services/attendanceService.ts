@@ -3,16 +3,27 @@ import type { IntercomAttendance } from '@/types/intercom';
 
 export const attendanceService = {
   async getByDateRange(startDate: string, endDate: string): Promise<IntercomAttendance[]> {
-    const { data, error } = await supabase
-      .from('intercom_attendance')
-      .select('*')
-      .gte('date', `${startDate}T00:00:00`)
-      .lte('date', `${endDate}T23:59:59`)
-      .order('date', { ascending: true })
-      .limit(10000);
+    const all: IntercomAttendance[] = [];
+    let offset = 0;
+    const pageSize = 1000;
 
-    if (error) throw error;
-    return data || [];
+    while (true) {
+      const { data, error } = await supabase
+        .from('intercom_attendance')
+        .select('*')
+        .gte('date', `${startDate}T00:00:00`)
+        .lte('date', `${endDate}T23:59:59`)
+        .order('date', { ascending: true })
+        .range(offset, offset + pageSize - 1);
+
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      all.push(...(data as IntercomAttendance[]));
+      if (data.length < pageSize) break;
+      offset += pageSize;
+    }
+
+    return all;
   },
 
   async getByUser(
@@ -20,23 +31,34 @@ export const attendanceService = {
     startDate?: string,
     endDate?: string,
   ): Promise<IntercomAttendance[]> {
-    let query = supabase
-      .from('intercom_attendance')
-      .select('*')
-      .eq('id_user', userId)
-      .order('date', { ascending: true });
+    const all: IntercomAttendance[] = [];
+    let offset = 0;
+    const pageSize = 1000;
 
-    if (startDate) query = query.gte('date', `${startDate}T00:00:00`);
-    if (endDate) query = query.lte('date', `${endDate}T23:59:59`);
+    while (true) {
+      let query = supabase
+        .from('intercom_attendance')
+        .select('*')
+        .eq('id_user', userId)
+        .order('date', { ascending: true });
 
-    const { data, error } = await query.limit(10000);
-    if (error) throw error;
-    return data || [];
+      if (startDate) query = query.gte('date', `${startDate}T00:00:00`);
+      if (endDate) query = query.lte('date', `${endDate}T23:59:59`);
+
+      const { data, error } = await query.range(offset, offset + pageSize - 1);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      all.push(...(data as IntercomAttendance[]));
+      if (data.length < pageSize) break;
+      offset += pageSize;
+    }
+
+    return all;
   },
 
   async getUniqueAttendants(): Promise<{ id_user: string; name: string; email: string }[]> {
     const allData: { id_user: string; name: string; email: string }[] = [];
-    const pageSize = 10000;
+    const pageSize = 1000; // Supabase anon key limita 1000 linhas por request
     let offset = 0;
 
     while (true) {
