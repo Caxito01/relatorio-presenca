@@ -152,19 +152,22 @@ export default function AttendantDailyReportPage() {
         name: a.name,
       }));
       setAttendants(attendantOptions);
-      setSelectedUserId(attendantOptions[0]?.id_user ?? "");
+      const firstId = attendantOptions[0]?.id_user ?? "";
+      setSelectedUserId(firstId);
+      // Carrega registros imediatamente com as datas certas (sem depender de closure)
+      if (firstId) await loadRecords(firstId, start, end);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Erro ao carregar atendentes";
       setError(msg);
     }
   };
 
-  const loadRecords = async (userId: string) => {
+  const loadRecords = async (userId: string, start: string, end: string) => {
     if (!userId) { setRecords([]); return; }
     try {
       setLoading(true);
       setError(null);
-      const userRecords = await attendanceService.getByUser(userId, startDate, endDate);
+      const userRecords = await attendanceService.getByUser(userId, start, end);
       setRecords(userRecords);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Erro ao carregar registros";
@@ -186,9 +189,8 @@ export default function AttendantDailyReportPage() {
   // Carrega registros sempre que usuário ou datas mudarem
   useEffect(() => {
     if (selectedUserId) {
-      loadRecords(selectedUserId);
+      loadRecords(selectedUserId, startDate, endDate);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUserId, startDate, endDate]);
 
   const dailySummaries: DailySummary[] = useMemo(
