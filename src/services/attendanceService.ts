@@ -45,6 +45,25 @@ export const attendanceService = {
     return unique as { id_user: string; name: string; email: string }[];
   },
 
+  async getByName(
+    name: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<IntercomAttendance[]> {
+    let query = supabase
+      .from('intercom_attendance')
+      .select('*')
+      .ilike('name', `%${name}%`)
+      .order('date', { ascending: true });
+
+    if (startDate) query = query.gte('date', `${startDate}T00:00:00`);
+    if (endDate) query = query.lte('date', `${endDate}T23:59:59`);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+
   async getCurrentStatus(): Promise<IntercomAttendance[]> {
     const { data, error } = await supabase
       .from('intercom_attendance')

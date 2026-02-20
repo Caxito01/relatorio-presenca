@@ -1,16 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { Calendar, Clock, User, Users, ArrowLeft } from "lucide-react";
+import { Calendar, Clock, Filter, User, Users, ArrowLeft } from "lucide-react";
 
 import { attendanceService } from "@/services/attendanceService";
 import type { IntercomAttendance } from "@/types/intercom";
 import { formatMinutes } from "@/lib/calculations";
-import {
-  processAttendanceRecords,
-  type ShiftPeriod,
-} from "@/lib/attendanceShifts";
+import { processAttendanceRecords } from "@/lib/attendanceShifts";
+import type { DailySummary } from "@/lib/attendanceShifts";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 type AttendantOption = {
@@ -30,31 +27,6 @@ type DailyRow = {
   reasons: string[];
 };
 
-function getDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function getDateKeyFromString(dateStr: string): string {
-  if (!dateStr) return "";
-  const [datePart] = dateStr.split("T");
-  return datePart && datePart.length >= 10
-    ? datePart.slice(0, 10)
-    : dateStr.slice(0, 10);
-}
-
-function getDisplayTime(dateStr: string): string {
-  if (!dateStr) return "-";
-  const parts = dateStr.split("T");
-  if (parts.length < 2) return "-";
-  const timePart = parts[1];
-  const [hour, minute] = timePart.split(":");
-  if (!hour || !minute) return "-";
-  return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
-}
-
 function formatFilterDate(dateStr: string): string {
   if (!dateStr) return "-";
   const [year, month, day] = dateStr.split("-");
@@ -68,7 +40,8 @@ function buildDailyRows(
 ): DailyRow[] {
   const byDay = records.reduce<Record<string, IntercomAttendance[]>>(
     (acc, rec) => {
-      const key = getDateKeyFromString(rec.date); // YYYY-MM-DD igual ao banco
+      const d = new Date(rec.date);
+      const key = d.toISOString().slice(0, 10); // YYYY-MM-DD
       if (!acc[key]) acc[key] = [];
       acc[key].push(rec);
       return acc;
@@ -82,7 +55,7 @@ function buildDailyRows(
   const end = new Date(`${endDate}T00:00:00`);
 
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const key = getDateKey(d);
+    const key = d.toISOString().slice(0, 10);
     const dayRecords = byDay[key] ?? [];
 
     if (dayRecords.length === 0) {
@@ -117,11 +90,10 @@ function buildDailyRows(
       const next = sorted[i + 1];
 
       const currentDate = new Date(current.date);
-      const currentTime = getDisplayTime(current.date);
       if (!firstEventTime) {
-        firstEventTime = currentTime;
+        firstEventTime = current.date.substring(11, 16); // HH:MM UTC
       }
-      lastEventTime = currentTime;
+      lastEventTime = current.date.substring(11, 16); // HH:MM UTC
 
       if (next) {
         const diffMinutes =
@@ -132,10 +104,11 @@ function buildDailyRows(
     }
 
     const anyRecord = sorted[sorted.length - 1];
-    const weekday = d.toLocaleDateString("pt-BR", {
+    const dayDate = new Date(key);
+    const weekday = dayDate.toLocaleDateString("pt-BR", {
       weekday: "long",
     });
-    const formattedDate = d.toLocaleDateString("pt-BR");
+    const formattedDate = dayDate.toLocaleDateString("pt-BR");
 
     const reasonsSet = new Set(
       sorted
@@ -165,7 +138,6 @@ export default function AttendantDailyReportPage() {
   const [records, setRecords] = useState<IntercomAttendance[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasAnyRecordInPeriod, setHasAnyRecordInPeriod] = useState(false);
 
   const today = new Date();
   const oneWeekAgo = new Date();
@@ -181,8 +153,6 @@ export default function AttendantDailyReportPage() {
       setLoading(true);
       setError(null);
       const data = await attendanceService.getByDateRange(startDate, endDate);
-
-      setHasAnyRecordInPeriod((data ?? []).length > 0);
 
       // gerar lista de atendentes únicos apenas dentro do período selecionado
       const uniqueAttendantsMap = new Map<string, AttendantOption>();
@@ -223,69 +193,20 @@ export default function AttendantDailyReportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUserId, startDate, endDate]);
 
+  const dailySummaries: DailySummary[] = useMemo(
+    () => processAttendanceRecords(records),
+    [records],
+  );
+
+  const allShifts = useMemo(
+    () => dailySummaries.flatMap((s) => s.shifts),
+    [dailySummaries],
+  );
+
   const dailyRows = useMemo(
     () => buildDailyRows(records, startDate, endDate),
     [records, startDate, endDate],
   );
-
-  const shiftRows = useMemo(() => {
-    if (records.length === 0) return [] as {
-      dateKey: string;
-      dateLabel: string;
-      shift: ShiftPeriod["shift"];
-      shiftLabel: string;
-      entryTime: string;
-      exitTime: string;
-      presentMinutes: number;
-      awayMinutes: number;
-      totalPresentMinutes: number;
-      totalAwayMinutes: number;
-    }[];
-
-    const summaries = processAttendanceRecords(records);
-
-    const rows: {
-      dateKey: string;
-      dateLabel: string;
-      shift: ShiftPeriod["shift"];
-      shiftLabel: string;
-      entryTime: string;
-      exitTime: string;
-      presentMinutes: number;
-      awayMinutes: number;
-      totalPresentMinutes: number;
-      totalAwayMinutes: number;
-    }[] = [];
-
-    summaries.forEach((summary) => {
-      summary.shifts.forEach((shift) => {
-        rows.push({
-          dateKey: summary.date,
-          dateLabel: formatFilterDate(summary.date),
-          shift: shift.shift,
-          shiftLabel: `${shift.shiftIcon} ${shift.shift}`,
-          entryTime: shift.entryFormatted,
-          exitTime: shift.exitFormatted,
-          presentMinutes: shift.presentMinutes,
-          awayMinutes: shift.awayMinutes,
-          totalPresentMinutes: shift.presentMinutes,
-          totalAwayMinutes: shift.awayMinutes,
-        });
-      });
-    });
-
-    // ordenar por data e ordem de turno
-    const order: ShiftPeriod["shift"][] = ["Manhã", "Tarde", "Noite"];
-
-    rows.sort((a, b) => {
-      if (a.dateKey === b.dateKey) {
-        return order.indexOf(a.shift) - order.indexOf(b.shift);
-      }
-      return a.dateKey < b.dateKey ? -1 : 1;
-    });
-
-    return rows;
-  }, [records, startDate, endDate]);
 
   const selectedUser = useMemo(
     () => attendants.find((a) => a.id_user === selectedUserId) || null,
@@ -293,16 +214,16 @@ export default function AttendantDailyReportPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Link
+            <a
               href="/"
               className="inline-flex items-center justify-center rounded-full border border-gray-200 p-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
-            </Link>
+            </a>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
                 Relatório Diário por Atendente
@@ -317,7 +238,7 @@ export default function AttendantDailyReportPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-6 space-y-6 flex-1">
+      <main className="max-w-7xl mx-auto p-6 space-y-6">
         <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2 min-w-[260px]">
             <Users className="w-5 h-5 text-gray-400" />
@@ -359,116 +280,67 @@ export default function AttendantDailyReportPage() {
               />
             </div>
           </div>
-        </section>
-        {!loading && !error && !hasAnyRecordInPeriod && (
-          <section className="flex items-center justify-center py-16">
-            <div className="text-center text-gray-500 text-sm">
-              Período selecionado sem registro
-            </div>
-          </section>
-        )}
 
-        {selectedUser && records.length > 0 && hasAnyRecordInPeriod && (
-          <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-4">
-            <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={loadData}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
+          >
+            <Filter className="w-4 h-4" />
+            Aplicar filtros
+          </button>
+        </section>
+
+        {/* ---- PRESENÇA POR TURNO ---- */}
+        {allShifts.length > 0 && (
+          <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <Clock className="w-5 h-5" />
                 Presença por turno
               </h2>
-              <span className="text-sm text-gray-500">
-                Agrupado por data e turno · Período: {formatFilterDate(startDate)} - {formatFilterDate(endDate)}
+              <span className="text-xs text-gray-400">
+                Agrupado por data e turno · Período: {formatFilterDate(startDate)} – {formatFilterDate(endDate)}
               </span>
             </div>
-
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
+              <table className="w-full text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">
-                      Atendente
-                    </th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">
-                      Data
-                    </th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">
-                      Turno
-                    </th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">
-                      Entrada
-                    </th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">
-                      Saída
-                    </th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">
-                      Presente
-                    </th>
-                    <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">
-                      Ausente
-                    </th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Atendente</th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Turno</th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Entrada</th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Saída</th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Presente</th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Ausente</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {shiftRows.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="px-4 py-6 text-center text-gray-500"
-                      >
-                        Nenhum registro para o período selecionado.
+                  {allShifts.map((shift, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 font-medium text-gray-900">{shift.name}</td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {new Date(shift.date + "T12:00:00Z").toLocaleDateString("pt-BR")}
                       </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                          {shift.shiftIcon} {shift.shift}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-800">{shift.entryFormatted}</td>
+                      <td className="px-6 py-4 text-gray-800">{shift.exitFormatted}</td>
+                      <td className="px-6 py-4 text-green-600 font-medium">{shift.presentFormatted}</td>
+                      <td className="px-6 py-4 text-red-600 font-medium">{shift.awayFormatted}</td>
                     </tr>
-                  )}
-                  {(() => {
-                    let lastDateKey: string | null = null;
-                    let useAltColor = false;
-
-                    return shiftRows.map((row, index) => {
-                      if (row.dateKey !== lastDateKey) {
-                        useAltColor = !useAltColor;
-                        lastDateKey = row.dateKey;
-                      }
-
-                      const rowBgClass = useAltColor
-                        ? "bg-gray-50"
-                        : "bg-white";
-
-                      return (
-                        <tr
-                          key={`${row.dateKey}-${row.shift}-${index}`}
-                          className={rowBgClass}
-                        >
-                          <td className="px-4 py-2 text-gray-700 font-medium">
-                            {selectedUser?.name}
-                          </td>
-                          <td className="px-4 py-2 text-gray-700">
-                            {row.dateLabel}
-                          </td>
-                          <td className="px-4 py-2 text-gray-700">
-                            {row.shiftLabel}
-                          </td>
-                          <td className="px-4 py-2 text-gray-700">
-                            {row.entryTime ?? "-"}
-                          </td>
-                          <td className="px-4 py-2 text-gray-700">
-                            {row.exitTime ?? "-"}
-                          </td>
-                          <td className="px-4 py-2 text-green-600 font-medium">
-                            {formatMinutes(row.totalPresentMinutes)}
-                          </td>
-                          <td className="px-4 py-2 text-red-600 font-medium">
-                            {formatMinutes(row.totalAwayMinutes)}
-                          </td>
-                        </tr>
-                      );
-                    });
-                  })()}
+                  ))}
                 </tbody>
               </table>
             </div>
           </section>
         )}
 
-        {selectedUser && records.length > 0 && hasAnyRecordInPeriod && (
+        {selectedUser && (
           <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold">
@@ -496,7 +368,6 @@ export default function AttendantDailyReportPage() {
           </section>
         )}
 
-        {hasAnyRecordInPeriod && (
         <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">
@@ -625,13 +496,7 @@ export default function AttendantDailyReportPage() {
             </div>
           )}
         </section>
-        )}
       </main>
-      <footer className="border-t border-gray-200 bg-white">
-        <div className="max-w-7xl mx-auto px-6 py-4 text-center text-xs text-gray-500">
-          © 2026 CECM - Relatório de Presença Botconversa
-        </div>
-      </footer>
     </div>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   Users,
@@ -12,20 +11,18 @@ import {
   Calendar,
   Filter,
   Download,
+  RefreshCw,
+  Search,
 } from "lucide-react";
 import { useAttendance } from "@/hooks/useAttendance";
 import type { AttendanceSummary, TimelineEvent } from "@/types/intercom";
 import { formatMinutes } from "@/lib/calculations";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 const formatTime = (dateStr: string): string => {
-  if (!dateStr) return "-";
-  const parts = dateStr.split("T");
-  if (parts.length < 2) return "-";
-  const timePart = parts[1];
-  const [hour, minute] = timePart.split(":");
-  if (!hour || !minute) return "-";
-  return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+  return new Date(dateStr).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 const formatDate = (dateStr: string): string => {
@@ -131,6 +128,7 @@ type DashboardProps = {
   startDate: string;
   endDate: string;
   onDateChange: (start: string, end: string) => void;
+  onRefresh: () => void;
 };
 
 function Dashboard({
@@ -138,22 +136,29 @@ function Dashboard({
   startDate,
   endDate,
   onDateChange,
+  onRefresh,
 }: DashboardProps) {
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | "online" | "away">(
     "all",
   );
+  const [nameFilter, setNameFilter] = useState("");
 
   const summaryData = useMemo(() => summary, [summary]);
 
   const filteredData = useMemo(
     () =>
       summaryData.filter((user) => {
-        if (statusFilter === "online") return user.currentStatus === "online";
-        if (statusFilter === "away") return user.currentStatus === "away";
-        return true;
+        const matchesStatus =
+          statusFilter === "all" ||
+          (statusFilter === "online" && user.currentStatus === "online") ||
+          (statusFilter === "away" && user.currentStatus === "away");
+        const matchesName =
+          nameFilter.trim() === "" ||
+          user.name.toLowerCase().includes(nameFilter.trim().toLowerCase());
+        return matchesStatus && matchesName;
       }),
-    [summaryData, statusFilter],
+    [summaryData, statusFilter, nameFilter],
   );
 
   const stats = useMemo(
@@ -228,29 +233,23 @@ function Dashboard({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              📊 CECM - Relatório de Presença  
+              📊 Relatório de Presença
             </h1>
             <p className="text-sm text-gray-500">Intercom - BotConversa</p>
           </div>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            <Link
-              href="/relatorios/atendente"
-              className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              <Users className="w-4 h-4" />
-              Relatório por atendente
-            </Link>
-          </div>
+          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <RefreshCw className="w-4 h-4" />
+            Atualizar
+          </button>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-6 flex-1">
+      <main className="max-w-7xl mx-auto p-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
@@ -277,6 +276,16 @@ function Dashboard({
               />
             </div>
             <div className="flex items-center gap-2">
+              <Search className="w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Buscar atendente..."
+                value={nameFilter}
+                onChange={(e) => setNameFilter(e.target.value)}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
+              />
+            </div>
+            <div className="flex items-center gap-2">
               <Filter className="w-5 h-5 text-gray-400" />
               <select
                 value={statusFilter}
@@ -290,6 +299,15 @@ function Dashboard({
                 <option value="away">Ausentes</option>
               </select>
             </div>
+            {/* Botão de atualizar usando o hook */}
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Atualizar
+            </button>
             <div className="ml-auto flex gap-2">
               <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors">
                 <Download className="w-4 h-4" />
@@ -408,11 +426,6 @@ function Dashboard({
           </div>
         </div>
       </main>
-      <footer className="border-t border-gray-200 bg-white">
-        <div className="max-w-7xl mx-auto px-6 py-4 text-center text-xs text-gray-500">
-          © 2026 CECM - Relatório de Presença Botconversa
-        </div>
-      </footer>
     </div>
   );
 }
@@ -451,6 +464,7 @@ export default function Home() {
         setStartDate(start);
         setEndDate(end);
       }}
+      onRefresh={refetch}
     />
   );
 }
