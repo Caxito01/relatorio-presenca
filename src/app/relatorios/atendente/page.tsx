@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Calendar, Clock, User, Users, ArrowLeft } from "lucide-react";
 
 import { attendanceService } from "@/services/attendanceService";
@@ -218,12 +219,12 @@ export default function AttendantDailyReportPage() {
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <a
+            <Link
               href="/"
               className="inline-flex items-center justify-center rounded-full border border-gray-200 p-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
-            </a>
+            </Link>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
                 Relatório Diário por Atendente
