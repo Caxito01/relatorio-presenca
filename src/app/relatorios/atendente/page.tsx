@@ -208,6 +208,12 @@ export default function AttendantDailyReportPage() {
     [dailySummaries],
   );
 
+  const sortedRecords = useMemo(() => {
+    return [...records].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
+  }, [records]);
+
   const dailyRows = useMemo(
     () => buildDailyRows(records, startDate, endDate),
     [records, startDate, endDate],
@@ -339,6 +345,84 @@ export default function AttendantDailyReportPage() {
                       <td className="px-6 py-4 text-red-600 font-medium">{shift.awayFormatted}</td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {/* ---- REGISTROS DO BANCO (UTC) ---- */}
+        {sortedRecords.length > 0 && (
+          <section className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Clock className="w-5 h-5" />
+                Registros do banco (UTC)
+              </h2>
+              <span className="text-xs text-gray-400">
+                Período: {formatFilterDate(startDate)} – {formatFilterDate(endDate)}
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">
+                      Data
+                    </th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">
+                      Horário
+                    </th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">
+                      Motivo
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {sortedRecords.map((rec) => {
+                    const dateKey = rec.date.substring(0, 10);
+                    const timeKey = rec.date.substring(11, 19);
+                    const isAway = rec.away_mode_enabled === 1;
+                    return (
+                      <tr key={rec.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-gray-600">
+                          {new Date(dateKey + "T12:00:00Z").toLocaleDateString("pt-BR")}
+                        </td>
+                        <td className="px-6 py-4 font-medium text-gray-900">{timeKey}</td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={
+                              isAway
+                                ? "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"
+                                : "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                            }
+                          >
+                            <span
+                              className={
+                                isAway
+                                  ? "w-2 h-2 mr-1.5 bg-red-500 rounded-full"
+                                  : "w-2 h-2 mr-1.5 bg-green-500 rounded-full"
+                              }
+                            />
+                            {isAway ? "Ausente" : "Online"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                          {rec.away_status_reason ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700">
+                              {rec.away_status_reason}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
