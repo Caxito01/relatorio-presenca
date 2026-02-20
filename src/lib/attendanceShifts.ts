@@ -59,8 +59,8 @@ export type ShiftName = keyof typeof SHIFTS;
 // =============================================
 
 function getMinutesOfDay(date: Date): number {
-  // Usa horário local (ex.: America/Sao_Paulo) para definir o minuto do dia
-  return date.getHours() * 60 + date.getMinutes();
+  // Usa horário UTC para ser consistente com os timestamps do Supabase
+  return date.getUTCHours() * 60 + date.getUTCMinutes();
 }
 
 function formatMinutesLocal(minutes: number): string {
@@ -82,8 +82,8 @@ function formatTime(dateStr: string): string {
 }
 
 function formatTimeFromDate(date: Date): string {
-  const hour = String(date.getHours()).padStart(2, "0");
-  const minute = String(date.getMinutes()).padStart(2, "0");
+  const hour = String(date.getUTCHours()).padStart(2, "0");
+  const minute = String(date.getUTCMinutes()).padStart(2, "0");
   return `${hour}:${minute}`;
 }
 
@@ -132,10 +132,10 @@ function splitPeriodByShifts(
 
     if (overlapStart < overlapEnd) {
       const periodEntry = new Date(entry);
-      periodEntry.setHours(Math.floor(overlapStart / 60), overlapStart % 60, 0, 0);
+      periodEntry.setUTCHours(Math.floor(overlapStart / 60), overlapStart % 60, 0, 0);
 
       const periodExit = new Date(entry);
-      periodExit.setHours(Math.floor(overlapEnd / 60), overlapEnd % 60, 0, 0);
+      periodExit.setUTCHours(Math.floor(overlapEnd / 60), overlapEnd % 60, 0, 0);
 
       const periodMinutes = overlapEnd - overlapStart;
       const ratio = totalMinutes > 0 ? periodMinutes / totalMinutes : 0;
