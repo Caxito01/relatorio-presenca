@@ -56,17 +56,21 @@ export const attendanceService = {
     return all;
   },
 
-  async getUniqueAttendants(): Promise<{ id_user: string; name: string; email: string }[]> {
+  async getUniqueAttendants(startDate?: string, endDate?: string): Promise<{ id_user: string; name: string; email: string }[]> {
     const allData: { id_user: string; name: string; email: string }[] = [];
     const pageSize = 1000; // Supabase anon key limita 1000 linhas por request
     let offset = 0;
 
     while (true) {
-      const { data, error } = await supabase
+      let query = supabase
         .from('intercom_attendance')
         .select('id_user, name, email')
-        .order('id_user')
-        .range(offset, offset + pageSize - 1);
+        .order('id_user');
+
+      if (startDate) query = query.gte('date', `${startDate}T00:00:00`);
+      if (endDate) query = query.lte('date', `${endDate}T23:59:59`);
+
+      const { data, error } = await query.range(offset, offset + pageSize - 1);
 
       if (error) throw error;
       if (!data || data.length === 0) break;
