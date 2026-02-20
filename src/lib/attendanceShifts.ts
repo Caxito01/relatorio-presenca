@@ -254,68 +254,85 @@ export function processAttendanceRecords(records: AttendanceRecord[]): DailySumm
 
       if (rawPeriods.length === 0) return;
 
-      // 4. Aplicar corte de turno no período total do dia
-      const firstEntry = rawPeriods[0].entry;
-      const lastExit = rawPeriods[rawPeriods.length - 1].exit;
+      // 4. Calcular presença/ausência exata por turno via interseção real
+      const shiftPresent: Record<ShiftName, number> = { Manhã: 0, Tarde: 0, Noite: 0 };
+      const shiftAway: Record<ShiftName, number> = { Manhã: 0, Tarde: 0, Noite: 0 };
+      const activeShifts = new Set<ShiftName>();
+      const shiftsOrder: ShiftName[] = ["Manhã", "Tarde", "Noite"];
 
-      const splits = splitPeriodByShifts(firstEntry, lastExit);
+      rawPeriods.forEach((period) => {
+        const periodStartMin = getMinutesOfDay(period.entry);
+        const periodEndMin = getMinutesOfDay(period.exit);
+        const isPresent = period.present > 0;
 
-      // Calcular totais do dia
-      let totalPresent = 0;
-      let totalAway = 0;
+        for (const shiftName of shiftsOrder) {
+          const shift = SHIFTS[shiftName];
+          const overlapStart = Math.max(periodStartMin, shift.start);
+          const overlapEnd = Math.min(periodEndMin, shift.end);
 
-      rawPeriods.forEach((p) => {
-        totalPresent += p.present;
-        totalAway += p.away;
+          if (overlapStart < overlapEnd) {
+            activeShifts.add(shiftName);
+            if (isPresent) {
+              shiftPresent[shiftName] += overlapEnd - overlapStart;
+            } else {
+              shiftAway[shiftName] += overlapEnd - overlapStart;
+            }
+          }
+        }
       });
 
-      // 5. Distribuir totais pelos turnos conforme a razão de cada split
+      // 5. Montar ShiftPeriods apenas para turnos com atividade real
       const shiftPeriods: Map<string, ShiftPeriod> = new Map();
+      const first = sorted[0];
 
-      splits.forEach((split) => {
-        const periodMinutes = (split.exit.getTime() - split.entry.getTime()) / 60000;
-        const presentInShift = Math.round(
-          (totalPresent * periodMinutes) / (totalPresent + totalAway || 1),
-        );
-        const awayInShift = Math.round(
-          (totalAway * periodMinutes) / (totalPresent + totalAway || 1),
-        );
+      for (const shiftName of shiftsOrder) {
+        if (!activeShifts.has(shiftName)) continue;
+
+        const shiftConfig = SHIFTS[shiftName];
+        const presentInShift = Math.round(shiftPresent[shiftName]);
+        const awayInShift = Math.round(shiftAway[shiftName]);
         const total = presentInShift + awayInShift;
         const availability = total > 0 ? Math.round((presentInShift / total) * 100) : 0;
 
-        const exitMinutes = getMinutesOfDay(split.exit);
-        const { status, label } = validateAndGetStatus(
-          presentInShift,
-          awayInShift,
-          split.shift,
-          exitMinutes,
-        );
-
-        const key = `${dateOnly}-${split.shift}`;
-
-        const first = sorted[0];
-
         // Encontrar primeiro e último registro do Supabase dentro do turno
-        const shiftConfig = SHIFTS[split.shift];
         const eventsInShift = sorted.filter((rec) => {
           const minutes = getMinutesOfDayFromString(rec.date);
           return minutes >= shiftConfig.start && minutes <= shiftConfig.end;
         });
 
+        const shiftStartDate = new Date(`${dateOnly}T00:00:00Z`);
+        shiftStartDate.setUTCHours(Math.floor(shiftConfig.start / 60), shiftConfig.start % 60, 0, 0);
+        const shiftEndDate = new Date(`${dateOnly}T00:00:00Z`);
+        shiftEndDate.setUTCHours(Math.floor(shiftConfig.end / 60), shiftConfig.end % 60, 0, 0);
+
         const displayEntryRaw =
-          eventsInShift.length > 0 ? eventsInShift[0].date : split.entry.toISOString();
+          eventsInShift.length > 0 ? eventsInShift[0].date : shiftStartDate.toISOString();
         const displayExitRaw =
           eventsInShift.length > 0
             ? eventsInShift[eventsInShift.length - 1].date
-            : split.exit.toISOString();
+            : shiftEndDate.toISOString();
+
+        const exitMinutes =
+          eventsInShift.length > 0
+            ? getMinutesOfDayFromString(eventsInShift[eventsInShift.length - 1].date)
+            : shiftConfig.end;
+
+        const { status, label } = validateAndGetStatus(
+          presentInShift,
+          awayInShift,
+          shiftName,
+          exitMinutes,
+        );
+
+        const key = `${dateOnly}-${shiftName}`;
 
         shiftPeriods.set(key, {
           id_user: userId,
           name: first.name,
           email: first.email,
           date: dateOnly,
-          shift: split.shift,
-          shiftIcon: SHIFTS[split.shift].icon,
+          shift: shiftName,
+          shiftIcon: SHIFTS[shiftName].icon,
           entry: displayEntryRaw,
           exit: displayExitRaw,
           entryFormatted: formatTime(displayEntryRaw),
@@ -328,7 +345,7 @@ export function processAttendanceRecords(records: AttendanceRecord[]): DailySumm
           status,
           statusLabel: label,
         });
-      });
+      }
 
       const shifts = Array.from(shiftPeriods.values());
       const dailyPresent = shifts.reduce((sum, s) => sum + s.presentMinutes, 0);
