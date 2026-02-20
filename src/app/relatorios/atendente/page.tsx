@@ -58,27 +58,9 @@ function buildDailyRows(
     const key = d.toISOString().slice(0, 10);
     const dayRecords = byDay[key] ?? [];
 
+    if (dayRecords.length === 0) continue;
+
     const dayDateForLabel = new Date(`${key}T12:00:00Z`);
-
-    if (dayRecords.length === 0) {
-      const weekday = dayDateForLabel.toLocaleDateString("pt-BR", {
-        weekday: "long",
-      });
-      const formattedDate = dayDateForLabel.toLocaleDateString("pt-BR");
-
-      rows.push({
-        dateKey: key,
-        label: `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)} - ${formattedDate}`,
-        weekday,
-        totalPresentMinutes: 0,
-        totalAwayMinutes: 0,
-        firstEventTime: null,
-        lastEventTime: null,
-        currentStatus: "none",
-        reasons: [],
-      });
-      continue;
-    }
 
     const sorted = [...dayRecords].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
