@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Calendar, Clock, Filter, User, Users, ArrowLeft } from "lucide-react";
+import { Calendar, Clock, User, Users, ArrowLeft } from "lucide-react";
 
 import { attendanceService } from "@/services/attendanceService";
 import type { IntercomAttendance } from "@/types/intercom";
@@ -191,8 +191,7 @@ export default function AttendantDailyReportPage() {
     }
   };
 
-  // Compatibilidade: loadData ainda funciona para o botão "Aplicar filtros"
-  const loadData = () => loadRecords(selectedUserId);
+  // Compatibilidade removida — filtros já aplicam via useEffect
 
   // Carrega lista de atendentes uma única vez (mount)
   useEffect(() => {
@@ -295,15 +294,6 @@ export default function AttendantDailyReportPage() {
               />
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={loadData}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
-          >
-            <Filter className="w-4 h-4" />
-            Aplicar filtros
-          </button>
         </section>
 
         {/* ---- PRESENÇA POR TURNO ---- */}

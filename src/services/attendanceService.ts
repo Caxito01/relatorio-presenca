@@ -35,16 +35,27 @@ export const attendanceService = {
   },
 
   async getUniqueAttendants(): Promise<{ id_user: string; name: string; email: string }[]> {
-    const { data, error } = await supabase
-      .from('intercom_attendance')
-      .select('id_user, name, email')
-      .order('name')
-      .limit(10000);
+    const allData: { id_user: string; name: string; email: string }[] = [];
+    const pageSize = 10000;
+    let offset = 0;
 
-    if (error) throw error;
+    while (true) {
+      const { data, error } = await supabase
+        .from('intercom_attendance')
+        .select('id_user, name, email')
+        .order('id_user')
+        .range(offset, offset + pageSize - 1);
 
-    const unique = [...new Map((data || []).map((i) => [i.id_user, i])).values()];
-    return unique as { id_user: string; name: string; email: string }[];
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+
+      allData.push(...(data as { id_user: string; name: string; email: string }[]));
+      if (data.length < pageSize) break;
+      offset += pageSize;
+    }
+
+    const unique = [...new Map(allData.map((i) => [i.id_user, i])).values()];
+    return unique.sort((a, b) => a.name.localeCompare(b.name));
   },
 
   async getByName(
